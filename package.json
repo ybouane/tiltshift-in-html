@@ -1,0 +1,39 @@
+{
+  "name": "tiltshift-in-html",
+  "version": "0.1.0",
+  "description": "Depth-aware tilt-shift optics for Three.js — a tilted (Scheimpflug) focus plane, physical depth of field, and an artistic screen band, in one drop-in pass.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "AGENTS.md", "LICENSE"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "threejs", "three", "tilt-shift", "tiltshift", "depth-of-field", "dof",
+    "bokeh", "postprocessing", "miniature", "scheimpflug", "webgl"
+  ],
+  "author": "ybouane (https://x.com/ybouane)",
+  "license": "MIT",
+  "homepage": "https://tiltshift-in-html.ybouane.com/",
+  "repository": { "type": "git", "url": "git+https://github.com/ybouane/tiltshift-in-html.git" },
+  "bugs": { "url": "https://github.com/ybouane/tiltshift-in-html/issues" },
+  "peerDependencies": { "three": ">=0.160.0" },
+  "devDependencies": {
+    "@types/three": "^0.185.1",
+    "three": "^0.185.1",
+    "typescript": "~5.9.0",
+    "vitest": "^4.1.10"
+  }
+}
