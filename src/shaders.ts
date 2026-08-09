@@ -145,3 +145,50 @@ void main() {
   gl_FragColor = acc / wsum;
 }
 `;
+
+export const TILEMAX_FRAG = /* glsl */ `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D tInput;   // downsample output (coc in alpha, normalized)
+uniform vec2 uTexelSize;    // texel of INPUT
+void main() {
+  float m = 0.0;
+  for (int y = -3; y <= 3; y += 2) {
+    for (int x = -3; x <= 3; x += 2) {
+      float c = texture2D(tInput, vUv + vec2(float(x), float(y)) * uTexelSize).a;
+      m = max(m, abs(c)); // either field can scatter over neighbours
+    }
+  }
+  gl_FragColor = vec4(m, 0.0, 0.0, 1.0);
+}
+`;
+
+export const DILATE_FRAG = /* glsl */ `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D tInput;
+uniform vec2 uTexelSize;
+void main() {
+  float m = 0.0;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      m = max(m, texture2D(tInput, vUv + vec2(float(x), float(y)) * uTexelSize).x);
+    }
+  }
+  gl_FragColor = vec4(m, 0.0, 0.0, 1.0);
+}
+`;
+
+/** Poisson disc (unit radius). Trimmed at runtime by uTaps. */
+const POISSON = [
+  [0.0, 0.0],
+  [0.5411, 0.1747], [-0.2138, 0.5219], [-0.5556, -0.1852], [0.1228, -0.5578],
+  [0.8358, -0.2905], [0.2825, 0.8455], [-0.7962, 0.4243], [-0.6392, -0.6501],
+  [0.4816, -0.7583], [0.9532, 0.2856], [-0.1655, 0.9573], [-0.9772, -0.0398],
+  [0.0559, -0.9868], [0.7053, 0.6349], [-0.5920, 0.7699], [-0.3646, -0.8901],
+  [0.3128, 0.3925], [-0.0788, -0.3253], [0.3714, -0.2314], [-0.4290, 0.1275],
+  [0.1697, 0.6688], [-0.6642, 0.1409], [0.6555, -0.0577], [-0.1112, -0.7370],
+  [0.2937, -0.6455], [0.6836, 0.3549], [-0.3796, 0.6208], [-0.7703, -0.3737],
+  [0.0459, 0.2741], [0.5155, -0.4577], [-0.2077, 0.2404], [-0.1274, -0.1214],
+  [0.8441, 0.0879], [-0.4986, -0.4625], [0.1268, 0.9948], [-0.9218, 0.2711],
+];
