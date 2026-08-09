@@ -92,3 +92,56 @@ float signedCocAt(vec2 uv) {
   return delta < 0.0 ? -coc : coc;
 }
 `;
+
+export const DOWNSAMPLE_FRAG = /* glsl */ `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D tColor;
+uniform vec2 uFullTexel;
+${'' /* COC_COMMON appended by material factory */}
+__COC_COMMON__
+void main() {
+  // CoC-aware downsample: plain bilinear averaging mixes foreground and
+  // background color across depth edges BEFORE the blur, which reads as a
+  // halo around 3D silhouettes. Weight the 4 source pixels by how similar
+  // their CoC is to this texel's CoC so edges stay unmixed.
+  float cocC = signedCocAt(vUv);
+  vec3 acc = vec3(0.0);
+  float wsum = 0.0;
+  for (int i = 0; i < 4; i++) {
+    vec2 o = vec2(i == 1 || i == 3 ? uFullTexel.x : -uFullTexel.x,
+                  i >= 2 ? uFullTexel.y : -uFullTexel.y) * 0.5;
+    vec3 col = texture2D(tColor, vUv + o).rgb;
+    float coc = signedCocAt(vUv + o);
+    float w = 1.0 / (0.15 + abs(coc - cocC) / max(uMaxCoc, 1e-4));
+    acc += col * w;
+    wsum += w;
+  }
+  gl_FragColor = vec4(acc / max(wsum, 1e-5), cocC / max(uMaxCoc, 1e-4));
+}
+`;
+
+/** 3x3 bilateral tent filter over the gather output — hides poisson noise and
+ *  smooths bokeh edges without re-bleeding across blur-amount discontinuities. */
+export const TENT_FRAG = /* glsl */ `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D tInput;
+uniform vec2 uTexelSize;
+void main() {
+  vec4 c = texture2D(tInput, vUv);
+  vec4 acc = c * 4.0;
+  float wsum = 4.0;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      if (x == 0 && y == 0) continue;
+      float g = (x == 0 || y == 0) ? 2.0 : 1.0; // tent kernel
+      vec4 tap = texture2D(tInput, vUv + vec2(float(x), float(y)) * uTexelSize);
+      float w = g / (0.25 + abs(tap.a - c.a) * 4.0);
+      acc += tap * w;
+      wsum += w;
+    }
+  }
+  gl_FragColor = acc / wsum;
+}
+`;
