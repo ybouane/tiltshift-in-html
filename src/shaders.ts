@@ -258,3 +258,63 @@ void main() {
   gl_FragColor = vec4(acc / max(wsum, 1e-5), clamp(cover / max(wsum, 1e-5), 0.0, 1.0));
 }
 `;
+
+export const COMPOSITE_FRAG = /* glsl */ `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D tColor;     // full-res sharp
+uniform sampler2D tBlur;      // half-res gather output (blend factor in alpha)
+uniform sampler2D tTileNear;
+uniform vec2 uFullTexel;
+uniform float uMaxCocPx;
+uniform float uBlurScale;
+uniform int uDebug; // 0 none, 1 depth, 2 coc, 3 near mask, 4 far mask
+__COC_COMMON__
+
+void main() {
+  vec3 sharp = texture2D(tColor, vUv).rgb;
+  float coc = signedCocAt(vUv);
+  float tileNear = texture2D(tTileNear, vUv).x * uMaxCocPx;
+
+  if (uDebug == 1) {
+    float z = linearDepthAt(vUv);
+    float v = 1.0 - exp(-z * 0.08);
+    gl_FragColor = vec4(vec3(v), 1.0); return;
+  }
+  if (uDebug == 2) {
+    float n = clamp(-coc / uMaxCocPx, 0.0, 1.0);
+    float f = clamp(coc / uMaxCocPx, 0.0, 1.0);
+    gl_FragColor = vec4(n, 1.0 - n - f, f, 1.0); return; // near=red, focus=green, far=blue
+  }
+  if (uDebug == 3) { gl_FragColor = vec4(vec3(clamp(max(-coc, tileNear) / uMaxCocPx, 0.0, 1.0)), 1.0); return; }
+  if (uDebug == 4) { gl_FragColor = vec4(vec3(clamp(coc / uMaxCocPx, 0.0, 1.0)), 1.0); return; }
+
+  // Upsample the reduced-res blur: 3x3 gaussian taps, weighted toward taps
+  // whose coverage matches the bilinear coverage at this point (keeps the
+  // sharp/blurred boundary crisp without ringing).
+  vec2 halfTexel = uFullTexel / max(uBlurScale, 0.05);
+  float refCover = texture2D(tBlur, vUv).a;
+  vec4 b = vec4(0.0);
+  float bw = 0.0;
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      float g = (i == 0 && j == 0) ? 4.0 : ((i == 0 || j == 0) ? 2.0 : 1.0);
+      vec4 tap = texture2D(tBlur, vUv + vec2(float(i), float(j)) * halfTexel * 0.6);
+      float w = g / (0.12 + abs(tap.a - refCover));
+      b += tap * w; bw += w;
+    }
+  }
+  vec4 blur = b / max(bw, 1e-5);
+
+  // Coverage IS the blend factor: it already encodes both this pixel's own
+  // defocus and any neighbour's light scattered over it (near or far field).
+  float ownBlur = smoothstep(0.5, 1.6, abs(coc));
+  float blend = clamp(max(smoothstep(0.04, 0.5, blur.a), ownBlur), 0.0, 1.0);
+  vec3 col = mix(sharp, blur.rgb, blend);
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+export function withCocCommon(frag: string): string {
+  return frag.replace('__COC_COMMON__', COC_COMMON);
+}
