@@ -192,3 +192,69 @@ const POISSON = [
   [0.0459, 0.2741], [0.5155, -0.4577], [-0.2077, 0.2404], [-0.1274, -0.1214],
   [0.8441, 0.0879], [-0.4986, -0.4625], [0.1268, 0.9948], [-0.9218, 0.2711],
 ];
+
+export const GATHER_FRAG = /* glsl */ `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D tInput;      // half-res color + normalized signed coc in alpha
+uniform sampler2D tTileNear;   // dilated near-coc tiles (normalized)
+uniform vec2 uTexelSize;       // texel of INPUT (half res)
+uniform float uMaxCocPx;       // max coc at FULL res in px
+uniform float uBlurScale;      // blur-target resolution / full resolution
+uniform int uTaps;
+const int MAX_TAPS = ${POISSON.length};
+const vec2 POISSON[MAX_TAPS] = vec2[](
+${POISSON.map(([x, y]) => `  vec2(${x.toFixed(4)}, ${y.toFixed(4)})`).join(',\n')}
+);
+
+void main() {
+  vec4 center = texture2D(tInput, vUv);
+  float centerCoc = center.a * uMaxCocPx;          // signed, full-res px
+  float tileSpread = texture2D(tTileNear, vUv).x * uMaxCocPx;
+  // per-pixel rotation of the poisson disc (interleaved gradient noise) —
+  // deterministic, breaks up banding; the tent post-filter smooths the noise
+  float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+  float ca = cos(6.2831853 * ign);
+  float sa = sin(6.2831853 * ign);
+  mat2 discRot = mat2(ca, sa, -sa, ca);
+  // gather radius: own blur, or anything nearby that scatters over us
+  float radiusPx = min(max(abs(centerCoc), tileSpread), uMaxCocPx);
+  if (radiusPx < 0.25) {
+    gl_FragColor = vec4(center.rgb, 0.0);
+    return;
+  }
+  vec2 radiusUv = radiusPx * uBlurScale * uTexelSize;
+
+  // Scatter-as-gather with rough energy conservation: a defocused tap spreads
+  // its energy over a disc, so its per-pixel contribution falls with its CoC
+  // area; sharp taps only ever contribute to their own pixel. The alpha
+  // channel accumulates COVERAGE — how much defocused light lands here — and
+  // the composite blends sharp/blurred by that coverage, which is what makes
+  // silhouettes melt smoothly instead of ringing.
+  vec3 acc = vec3(0.0);
+  float wsum = 0.0;
+  float cover = 0.0;
+  for (int i = 0; i < MAX_TAPS; i++) {
+    if (i >= uTaps) break;
+    vec2 offs = (discRot * POISSON[i]) * radiusUv;
+    vec4 tap = texture2D(tInput, vUv + offs);
+    float tapCoc = tap.a * uMaxCocPx;
+    float tapDistPx = length(POISSON[i]) * radiusPx;
+    // does this tap's blur disc reach us?
+    float reach = i == 0 ? 1.0 : smoothstep(tapDistPx - 1.0, tapDistPx + 1.0, abs(tapCoc));
+    // energy of a defocused tap is spread over its disc
+    float energy = 1.0 / (1.0 + abs(tapCoc) * abs(tapCoc) * 0.15);
+    float w = reach * energy;
+    // Keep a floor on the centre only so wsum can never divide by zero. It
+    // must stay far BELOW a typical tap weight: a large floor makes the sharp
+    // centre pixel dominate the average as CoC grows (every tap's energy tends
+    // to zero together), which reads as the unblurred image fading back in
+    // underneath heavy blur.
+    if (i == 0) w = max(w, 1e-4);
+    acc += tap.rgb * w;
+    wsum += w;
+    cover += w * smoothstep(0.35, 1.1, abs(tapCoc));
+  }
+  gl_FragColor = vec4(acc / max(wsum, 1e-5), clamp(cover / max(wsum, 1e-5), 0.0, 1.0));
+}
+`;
