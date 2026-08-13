@@ -85,3 +85,31 @@ export function computeFocusPlane(
   n.applyEuler(euler).applyQuaternion(camera.quaternion).normalize();
   out.normal.copy(n);
 }
+
+/**
+ * A critically damped spring, for moving focus without it snapping.
+ *
+ * A real lens takes time to rack, and the eye reads an instant change as a cut
+ * rather than as a focus pull. Critically damped means it never overshoots,
+ * which a focus puller also never does.
+ */
+export class FocusSpring {
+  velocity = 0;
+
+  constructor(public value: number, public stiffness = 42, public damping = 13) {}
+
+  /** Step toward `target` by `dt` seconds. Returns the new value. */
+  update(target: number, dt: number): number {
+    const step = Math.min(dt, 1 / 30); // one long frame must not launch it
+    const a = (target - this.value) * this.stiffness - this.velocity * this.damping;
+    this.velocity += a * step;
+    this.value += this.velocity * step;
+    return this.value;
+  }
+
+  /** Jump straight there — for scene changes, where a rack would be wrong. */
+  reset(value: number): void {
+    this.value = value;
+    this.velocity = 0;
+  }
+}
