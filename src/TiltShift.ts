@@ -150,6 +150,15 @@ export class TiltShift {
     return { ...this.quality, level: this.options.quality === 'auto' ? this.adaptive.level : this.options.quality };
   }
 
+  /**
+   * Triangles drawn by the scene pass on the last frame. three's `info.render`
+   * is reset by every subsequent pass, so by the time you could read it the
+   * post-processing quads are all that is left in it.
+   */
+  get lastSceneTriangles(): number {
+    return this.pipeline.lastSceneTriangles;
+  }
+
   /** The colour target the scene was rendered into, with its depth texture. */
   get sceneTarget(): THREE.WebGLRenderTarget {
     return this.pipeline.sceneRT;
