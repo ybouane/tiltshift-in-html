@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tiltshift-in-html — basic</title>
+    <style>
+      body { margin: 0; overflow: hidden; background: #12101a; font: 13px system-ui, sans-serif; }
+      .hint { position: fixed; left: 14px; bottom: 14px; color: #fff9; }
+    </style>
+  </head>
+  <body>
+    <p class="hint">move the pointer — focus follows what is under it</p>
+    <script type="importmap">
+      { "imports": {
+          "three": "https://unpkg.com/three@0.185.1/build/three.module.js",
+          "tiltshift-in-html": "../dist/index.js"
+      } }
+    </script>
+    <script type="module">
+      import * as THREE from 'three';
+      import { TiltShift, focusDistanceAtPointer, FocusSpring } from 'tiltshift-in-html';
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+      renderer.setSize(innerWidth, innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x1b1726);
+      const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 200);
+      camera.position.set(0, 7, 11);
+      camera.lookAt(0, 0, 0);
+
+      scene.add(new THREE.HemisphereLight(0xffeedd, 0x223344, 2.2));
+      const key = new THREE.DirectionalLight(0xffffff, 2);
+      key.position.set(-6, 10, 6);
+      scene.add(key);
+
+      // a little city, so there is something to be in and out of focus
+      const geo = new THREE.BoxGeometry(1, 1, 1);
+      for (let i = 0; i < 400; i++) {
+        const h = 0.4 + Math.random() ** 2 * 5;
+        const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
+          color: new THREE.Color().setHSL(0.08 + Math.random() * 0.12, 0.5, 0.35 + Math.random() * 0.3),
+        }));
+        m.position.set((Math.random() - 0.5) * 44, h / 2, (Math.random() - 0.5) * 44);
+        m.scale.set(0.7 + Math.random(), h, 0.7 + Math.random());
+        scene.add(m);
+      }
+
+      // ---- the whole integration ----
+      const tilt = new TiltShift(renderer, {
+        model: 'plane',      // the tilted focus plane: what makes it read as a model
+        planePitch: 24,
+        aperture: 64,
+        maxCoc: 30,
+        focusDistance: 13,
+      });
+
+      const pointer = new THREE.Vector2(0, 0);
+      const spring = new FocusSpring(13);
+      addEventListener('pointermove', (e) => {
+        pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+      });
+      addEventListener('resize', () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+        tilt.syncSize();
+      });
+
+      let last = performance.now();
+      renderer.setAnimationLoop(() => {
+        const now = performance.now();
+        const dt = (now - last) / 1000;
+        last = now;
+
+        const hit = focusDistanceAtPointer(camera, scene, pointer);
+        if (hit !== null) tilt.options.focusDistance = spring.update(hit, dt);
+
+        tilt.render(scene, camera);   // instead of renderer.render(scene, camera)
+      });
+    </script>
+  </body>
+</html>
