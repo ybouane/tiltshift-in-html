@@ -87,3 +87,34 @@ a way you cannot name.
 `'near'` and `'far'` show the linear depth and the two field masks. If the
 image looks wrong, look at `'coc'` first — nearly every problem is visible
 there, and none of them are visible in the final image.
+
+## What is NOT in this package
+
+The demo at <https://tiltshift-in-html.ybouane.com/> renders **real, live,
+interactive HTML inside the WebGL scene** — actual DOM forms lying on the floor
+of a diorama, blurred by these same optics. That uses the experimental
+[HTML-in-Canvas API](https://github.com/WICG/html-in-canvas)
+(`<canvas layoutsubtree>`, `gl.texElementImage2D`, `canvas.requestPaint()`),
+which is behind a flag in Chrome 148+ and exists in no other engine.
+
+It is deliberately **not** part of this library, and should not be added to it:
+
+- it would make a library that works everywhere depend on an API that works
+  almost nowhere;
+- the HTML surface work is a different problem (layout, hit-testing, stacking,
+  paint events) that has nothing to do with optics;
+- this pass is useful to people who will never enable that flag.
+
+If you are asked to build something with HTML-in-Canvas, the demo repository is
+the reference implementation and carries a findings document covering the
+alignment traps, capability detection, and version-specific behaviour:
+<https://github.com/ybouane/tiltshift-in-html-demo>.
+
+## Conventions in this repo
+
+- TypeScript, strict, ESM only. `npm run build` emits `dist/` with types.
+- `npm test` runs vitest over pure logic — optics maths, the focus helpers, the
+  adaptive quality ladder. Anything that needs a GPU is not unit tested here;
+  it is verified in the demo.
+- No runtime dependency may be added. `three` stays a peer dependency, and the
+  package must keep working with any `three` from r160 up.
