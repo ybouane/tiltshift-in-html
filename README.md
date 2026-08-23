@@ -1,5 +1,8 @@
 [![tiltshift-in-html](https://tiltshift-in-html.ybouane.com/og-banner.jpg)](https://tiltshift-in-html.ybouane.com/)
 
+Built by **[@ybouane](https://x.com/ybouane)** · see also
+[liquidglass](https://github.com/ybouane/liquidglass)
+
 **Depth-aware tilt-shift optics for [Three.js](https://threejs.org).** A tilted
 (Scheimpflug) focus plane, a physical depth of field, and an artistic screen
 band — in one drop-in pass. See it running at
@@ -174,7 +177,3 @@ itself as a peer.
 
 MIT — [ybouane](https://x.com/ybouane)
 
----
-
-Built by **[@ybouane](https://x.com/ybouane)** · see also
-[liquidglass](https://github.com/ybouane/liquidglass)
