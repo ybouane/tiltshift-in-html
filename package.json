@@ -1,6 +1,6 @@
 {
   "name": "tiltshift-in-html",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Depth-aware tilt-shift optics for Three.js — a tilted (Scheimpflug) focus plane, physical depth of field, and an artistic screen band, in one drop-in pass.",
   "type": "module",
   "main": "./dist/index.js",
